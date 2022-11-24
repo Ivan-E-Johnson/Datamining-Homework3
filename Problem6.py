@@ -1,5 +1,5 @@
 import pandas as pd
-import numpy as npensamble
+import numpy as np
 import matplotlib as plt
 from sklearn import preprocessing
 from sklearn import model_selection
@@ -7,11 +7,12 @@ from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import HistGradientBoostingClassifier
 
+from sklearn.model_selection import cross_val_score
 
-
-# noinspection PyUnresolvedReferences
-from sklearn.cross_validation import Bootstrap #need to see if we can use this package
 def read_data(Filename):
 	return 	pd.read_csv(Filename, sep= '\t', header= None)
 
@@ -48,7 +49,8 @@ def Generic(df,label, clf, test_size = .33):
 	prob_predict = clf.predict_proba(X_test)
 	predict = clf.predict(X_test)
 	score = clf.score(X_test , y_test)
-	return  X_test, y_test, predict, prob_predict, score
+
+	return  X_test, y_test, predict, prob_predict, score, cross_val_score(clf,df, label, cv = 10 )
 
 def KNN(df, label,nneighbors =5, test_size = .33):
 	clf  = KNeighborsClassifier(nneighbors, weights= "uniform")
@@ -67,11 +69,13 @@ def DT(df, label,test_size = .33, criterion ="gini",splitter = "best"):
 	return Generic(df, label, clf, test_size)
 
 
-def RandomForrest(df, label,subSample , num_trees = 15, test_size= .33):
-	for tree in range(num_trees):
-		print("Hi")
+def RandomForrest(df, label ,num_estimators = 100,test_size = .33 ,):
+	clf = RandomForestClassifier(n_estimators = num_estimators, bootstrap=True)
+	return Generic(df,label, clf, test_size)
 
-	pass
+def HistGradiantBoosted(df, label ,test_size = .33 ,):
+	clf = HistGradientBoostingClassifier()
+	return Generic(df,label, clf, test_size)
 
 
 
@@ -84,17 +88,19 @@ def RandomForrest(df, label,subSample , num_trees = 15, test_size= .33):
 
 df1, label1, df2, label2 = get_data()
 
-funcs = [KNN, NB, SVM, DT]
-funcName = ["KNN", "NaiveBayes", "SupportVectorMachine", "DecisionTree"]
+funcs = [KNN, NB, SVM, DT, RandomForrest, HistGradiantBoosted]
+funcName = ["KNN", "NaiveBayes", "SupportVectorMachine", "DecisionTree", "RandomForrest", "HistGradiantBoosted"]
 data = [df1, df2]
 labels = [label1, label2]
 dataName = ["data_set_1_", "data_set_2_"]
 scores = {}
+ten_fold_cross_validation_score = {}
 for df,label, df_name in zip(data,labels,dataName):
 	for func,name in zip(funcs, funcName):
-		X_test, Y_test, prediction, prob_prediction, score =  func(df,label)
-		scores[df_name+name] = score
+		X_test, Y_test, prediction, prob_prediction, score, cross_val =  func(df,label)
 
+		scores[df_name+name] = score
+		ten_fold_cross_validation_score[df_name+name] = cross_val
 
 
 
