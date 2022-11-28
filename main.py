@@ -71,7 +71,7 @@ def remove_stopwords(tokens):
 def remove_nums(tokens):
     #words = review_content.split()
     #bwords = ["NUM" if word.isnumeric() else word for word in tokens]
-    return ["NUM" if word.isnumeric() else word for word in tokens]
+    return ["num" if word.isnumeric() else word for word in tokens]
     #return " ".join(bwords)
 def remove_punct(review_content):
     return review_content.translate(str.maketrans("", "", string.punctuation))
@@ -100,7 +100,7 @@ def get_freq_data( train_data:dict, counts: pd.DataFrame):
     doc_freq = dict.fromkeys(counts["Word"] , 0)
     for cfile in train_data:
         doc_tokens = get_document_tokens(train_data[cfile]["Reviews"])
-        for token in doc_tokens:
+        for token in doc_tokens: #FIXME THIS ADDS IT FOR EVERY OCCURENCY OR SOMETHING IM NOT SURE WHY THIS IS RETURNING ALL 25'S
             doc_freq[token] +=1
 
     return doc_freq
@@ -153,11 +153,14 @@ if __name__ == '__main__':
 
     all_files, train, test ,reviews = read_data()
     #PARTA DEVLIVERABLES
-    preped_all_data, all_review_tokens = prep_all_data(all_files)
+    #preped_all_data, all_review_tokens = prep_all_data(all_files)
+    prep_test_data, test_tokens = prep_all_data(test)
     preped_train_data, train_tokens = prep_all_data(train)
-    c_dict = preped_all_data['3OLZOlqgOXdqY0uwxcOTfw.json']
+    c_dict = preped_train_data['9IRdWhDNo2T6vyMLwrQdMw.json']
     df = c_dict["Reviews"]
-
+    all_review_tokens =[]
+    all_review_tokens.extend(train_tokens)
+    all_review_tokens.extend(test_tokens)
     #PARTB DELIVERABLES
     counts = get_word_frequency(all_review_tokens)
     #plot_word_frequency(counts, save = True)
@@ -166,7 +169,7 @@ if __name__ == '__main__':
     #PARTC Deliverables
     train_tokens.extend(generate_bigrams(preped_train_data))
     train_counts = get_word_frequency(train_tokens)
-
+    DF = get_freq_data(preped_train_data, counts)
 
 
     print("Finished")
