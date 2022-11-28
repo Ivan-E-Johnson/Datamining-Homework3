@@ -102,16 +102,35 @@ def get_unigrams_list(df:pd.DataFrame):
 def get_document_tokens(df: pd.DataFrame):
     freq = get_unigrams_list(df)
     freq.extend(get_bigrams_list(df))
-    return set(freq)
+    return Counter(freq).keys()
 
 def get_freq_data( train_data:dict, counts: pd.DataFrame):
     doc_freq = dict.fromkeys(counts["Word"] , 0)
     for cfile in train_data:
-        doc_tokens = get_document_tokens(train_data[cfile]["Reviews"])
-        for token in doc_tokens:
-            doc_freq[token] = doc_freq[token] + 1
+        #doc_tokens = get_document_tokens(train_data[cfile]["Reviews"])
+        df= train_data[cfile]["Reviews"]
+        for row in df.itertuples():
+            for token in set(row.bigrams):
+                if token in doc_freq:
+                    # FIXME Only Add Once per doc
+                    doc_freq[token] += 1
+            for token in set(row.Unigrams):
+                if token in doc_freq:
+                    # FIXME Unsure why this must be done but it breaks if you dont
+                    doc_freq[token] += 1
+        #for token in doc_tokens:
 
+#            else:
+#                doc_freq[str(token)] = 1
     return doc_freq
+
+
+def update_counts(counts: pd.DataFrame, df: pd.DataFrame):
+    updated = pd.merge(right = df,left = counts, on = "Word")
+    updated.drop("DF_x", axis=1, inplace = True)
+    updated.rename(columns={"DF_y" : "Doc_Freq"}, inplace=True)
+    updated = updated[updated["Doc_Freq"]] > 50
+    return updated
 
 def generate_bigrams(train_data : dict):
     bigrams = []
@@ -220,8 +239,11 @@ if __name__ == '__main__':
 
     #PARTC Deliverables
     train_counts = get_word_frequency(train_tokens)
-    DF = get_freq_data(prep_train_data , counts)
-
-
+    doc_freqency = pd.DataFrame(get_freq_data(prep_train_data , counts).items() , columns=["Word" , "DF"])
+    counts = update_counts(counts, doc_freqency)
+    print("Top 50 NGrams")
+    print(counts.sort_values(["Doc_Freq", "TTF"], ascending = False).head(50))
+    print("Bottom 50 NGrams")
+    print(counts.sort_values(["Doc_Freq" , "TTF"]).head(50))
     print("Finished")
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
