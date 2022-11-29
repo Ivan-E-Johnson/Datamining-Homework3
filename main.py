@@ -1,4 +1,5 @@
 # This is a sample Python script.
+import math
 import os
 # Press Shift+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
@@ -17,6 +18,7 @@ from nltk.stem import PorterStemmer
 from nltk.corpus import stopwords
 from nltk.util import ngrams
 from copy import deepcopy
+import numpy as np
 def read_data():
     #FIXME Change this to Train
     paths = ["restaurants/test/", "restaurants/train/"]
@@ -40,7 +42,6 @@ def read_data():
 
                 all_files[file] = deepcopy(data_dict)
     return all_files, train, test, reviews
-
 
 def prep_all_data(all_files):
     unigram_tokens = []
@@ -104,6 +105,49 @@ def get_document_tokens(df: pd.DataFrame):
     freq.extend(get_bigrams_list(df))
     return Counter(freq).keys()
 
+def get_counts(train_data: dict, filter= 50):
+    num_Docs = 0
+    doc_freq = {}
+    TTF_freq = {}
+    for cfile in train_data:
+        # doc_tokens = get_document_tokens(train_data[cfile]["Reviews"])
+        df = train_data[cfile]["Reviews"]
+        num_Docs += len(df)
+        for row in df.itertuples():
+            b = Counter(row.bigrams)
+            u = Counter(row.Unigrams)
+            for token in b:
+                if token in doc_freq:
+                    doc_freq[token] +=1
+                else:
+                    doc_freq[token] = 1
+                if token in TTF_freq:
+                    TTF_freq[token] += b.get(token)
+                else:
+                    TTF_freq[token] = b.get(token)
+            for token in u:
+                if token in doc_freq:
+                    doc_freq[token] +=1
+                else:
+                    doc_freq[token] = 1
+                if token in TTF_freq:
+                    TTF_freq[token] += u.get(token)
+                else:
+                    TTF_freq[token] = u.get(token)
+
+    df1 = pd.DataFrame(doc_freq.items() , columns=["Word" , "Doc_Freq"])
+    df2 = pd.DataFrame(TTF_freq.items() , columns=["Word" , "TTF"])
+    df3 = pd.concat([df1,df2], axis=1)
+    df3.columns = ["Word" , "Doc_Freq" , "DROP" , "TTF"]
+    df3.drop("DROP", axis = 1, inplace = True)
+    df3 = df3[df3["Doc_Freq"] > filter]
+    df3.sort_values(by="TTF" , inplace=True , ascending=False)
+    df3["Rank"] = df3["TTF"].rank(method='dense' , ascending=False)
+    df3["IDF"] = (1 + np.log( num_Docs/ df3["Doc_Freq"] ))
+    return df3
+
+
+
 def get_freq_data( train_data:dict, counts: pd.DataFrame):
     doc_freq = dict.fromkeys(counts["Word"] , 0)
     for cfile in train_data:
@@ -113,10 +157,10 @@ def get_freq_data( train_data:dict, counts: pd.DataFrame):
             for token in set(row.bigrams):
                 if token in doc_freq:
                     # FIXME Only Add Once per doc
+                    #print(token)
                     doc_freq[token] += 1
             for token in set(row.Unigrams):
                 if token in doc_freq:
-                    # FIXME Unsure why this must be done but it breaks if you dont
                     doc_freq[token] += 1
         #for token in doc_tokens:
 
@@ -124,12 +168,14 @@ def get_freq_data( train_data:dict, counts: pd.DataFrame):
 #                doc_freq[str(token)] = 1
     return doc_freq
 
-
+#DEPRECIATED
 def update_counts(counts: pd.DataFrame, df: pd.DataFrame):
     updated = pd.merge(right = df,left = counts, on = "Word")
-    updated.drop("DF_x", axis=1, inplace = True)
-    updated.rename(columns={"DF_y" : "Doc_Freq"}, inplace=True)
-    updated = updated[updated["Doc_Freq"]] > 50
+    if "Doc_Freq_x" in updated.columns:
+        updated.drop("Doc_Freq_x", axis=1, inplace = True)
+        updated.rename(columns={"Doc_Freq_y" : "Doc_Freq"}, inplace=True)
+    updated = updated[updated["Doc_Freq"] > 50]  #This is where we filter out the bad data
+
     return updated
 
 def generate_bigrams(train_data : dict):
@@ -168,6 +214,7 @@ def plot_word_frequency(word_counts : pd.DataFrame, save = False, title = '' ):
         plt.show()
 
 
+
 def reload_tokens(file_dict : dict):
     uni_tokens = []
     bi_tokens = []
@@ -188,12 +235,20 @@ def load_data():
     for file in os.listdir(test_path):
         if "csv" in file:
             c_dict["Reviews"] = pd.read_csv(test_path + file,  lineterminator='\n')
+            c_dict["Reviews"].drop("Unnamed: 0" , axis = 1, inplace = True)
+            if "bigrams\r" in c_dict["Reviews"].columns:
+                c_dict["Reviews"].rename(columns={"bigrams\r": "bigrams"} , inplace=True)
+
             with open(test_path + "Resturaunt/" + file[:-4], 'r') as fp:
                 c_dict["Resturaunt"] = json.load(fp)
             test[file[:-4]] = deepcopy(c_dict)
     for file in os.listdir(train_path):
         if "csv" in file:
             c_dict["Reviews"] = pd.read_csv(train_path + file,  lineterminator='\n')
+            c_dict["Reviews"].drop("Unnamed: 0" , axis=1 , inplace=True)
+            if "bigrams\r" in c_dict["Reviews"].columns:
+                c_dict["Reviews"].rename(columns={"bigrams\r": "bigrams"} , inplace=True)
+
             with open(train_path + "Resturaunt/" + file[:-4] , 'r') as fp:
                 c_dict["Resturaunt"] = json.load(fp)
             train[file[:-4]] = deepcopy(c_dict)
@@ -221,7 +276,7 @@ if __name__ == '__main__':
     train_tokens = []
     train_tokens.extend(train_uni_tokens)
     train_tokens.extend(train_bi_tokens)
-
+    print("Finished with loading Data")
     c_dict = prep_train_data['9IRdWhDNo2T6vyMLwrQdMw.json']
     df = c_dict["Reviews"]
     all_review_tokens =[]
@@ -232,18 +287,23 @@ if __name__ == '__main__':
     plot_word_frequency(counts, save = True, title= "Uni_")
     #plot_word_frequency(counts, save = False)
     all_review_tokens.extend(test_bi_tokens)
+    all_review_tokens.extend(train_bi_tokens)
     counts = get_word_frequency(all_review_tokens)  # With bigrams
     plot_word_frequency(counts , save=True, title = "All_")
 
 
 
     #PARTC Deliverables
-    train_counts = get_word_frequency(train_tokens)
-    doc_freqency = pd.DataFrame(get_freq_data(prep_train_data , counts).items() , columns=["Word" , "DF"])
-    counts = update_counts(counts, doc_freqency)
+    train_counts = get_counts(prep_train_data)
+    test_counts = get_counts(prep_test_data)
+    # train_counts = get_word_frequency(train_tokens)
+    # doc_freqency = pd.DataFrame(get_freq_data(prep_train_data , train_counts).items() , columns=["Word" , "Doc_Freq"])
+    # counts = update_counts(train_counts, doc_freqency)
+    print("Total number of NGrams")
+    print(len(train_counts))
     print("Top 50 NGrams")
-    print(counts.sort_values(["Doc_Freq", "TTF"], ascending = False).head(50))
+    print(train_counts.head(50))
     print("Bottom 50 NGrams")
-    print(counts.sort_values(["Doc_Freq" , "TTF"]).head(50))
+    print(train_counts.tail(50))
     print("Finished")
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
