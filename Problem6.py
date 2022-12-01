@@ -12,7 +12,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import HistGradientBoostingClassifier
 
 from sklearn.model_selection import cross_val_score
-
+import json
 def read_data(Filename):
 	return 	pd.read_csv(Filename, sep= '\t', header= None)
 
@@ -50,7 +50,12 @@ def Generic(df,label, clf, test_size = .33):
 	predict = clf.predict(X_test)
 	score = clf.score(X_test , y_test)
 
-	return  X_test, y_test, predict, prob_predict, score, cross_val_score(clf,df, label, cv = 10 )
+	crossVal = {}
+	methods = ["accuracy", "f1", "precision", "recall" ]
+	for method in methods:
+		crossVal[method] = list(cross_val_score(clf,df, label, cv = 10, scoring=method ))
+
+	return  X_test, y_test, predict, prob_predict, score, crossVal
 
 def KNN(df, label,nneighbors =5, test_size = .33):
 	clf  = KNeighborsClassifier(nneighbors, weights= "uniform")
@@ -113,8 +118,9 @@ for df,label, df_name in zip(data,labels,dataName):
 #TODO Adopt  10-fold  Cross  Validation  to  evaluate  the  performance  of  all  methods  on  the
 # provided two datasets in terms of Accuracy, Precision, Recall, and F-1 measure
 
-
-
+print(ten_fold_cross_validation_score)
+with open("ten_fold_cross_validation_score.json", "w") as outfile:
+    json.dump(ten_fold_cross_validation_score, outfile)
 
 print("Finished")
 
