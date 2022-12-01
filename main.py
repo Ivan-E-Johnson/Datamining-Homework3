@@ -44,6 +44,19 @@ def read_data():
 				all_files[file] = deepcopy(data_dict)
 	return all_files, train, test, reviews
 
+def load_Query():
+	with open("QUERY.JSON") as project_file:
+		data = json.load(project_file)
+		df =prep_data(pd.DataFrame.from_dict(data["Reviews"]))
+		df = vectorize_prep(df)
+		tf = []
+		for row in df.itertuples():
+			tf_dict = {}
+			for token in row.Counts.keys():
+				tf_dict[token] = row.Counts[token] / row.Doc_len
+			tf.append(tf_dict)
+		df["TF"] = tf
+		return df
 def prep_all_data(all_files):
 	unigram_tokens = []
 	bigram_tokens = []
@@ -85,7 +98,7 @@ def remove_nums(tokens):
 def remove_punct(review_content):
 	return review_content.translate(str.maketrans("", "", string.punctuation))
 
-def calc_doc_len(content:string):
+def calc_doc_len(content:str):
 	return(len(content.split()))
 
 
@@ -144,7 +157,7 @@ def get_counts(train_data: dict, filter= 50):
 	df3 = pd.concat([df1,df2], axis=1)
 	df3.columns = ["Word" , "Doc_Freq" , "DROP" , "TTF"]
 	df3.drop("DROP", axis = 1, inplace = True)
-	df3 = df3[df3["Doc_Freq"] > filter]
+	#df3 = df3[df3["Doc_Freq"] > filter]
 	df3.sort_values(by="TTF" , inplace=True , ascending=False)
 	df3["Rank"] = df3["TTF"].rank(method='dense' , ascending=False)
 	df3["IDF"] = (1 + np.log( num_Docs/ df3["Doc_Freq"] ))
@@ -159,26 +172,40 @@ def vectorize_prep(df: pd.DataFrame):
 	df["Counts"] = df["Ngram"].apply(Counter)
 	df["Doc_len"] = df["Content"].apply(calc_doc_len)
 	return df
-def calc_tf(test_data: dict):
+def calc_tf(test_data: dict, word_counts : pd.DataFrame):
+	idf_dict = dict(word_counts[["Word","IDF"]].values)
+	ave_idf= np.mean(list(idf_dict.values()))
 	updated = {}
 	for cfile in test_data:
 		df = test_data[cfile]["Reviews"]
+		print(cfile)
 		df = vectorize_prep(df)
 		tf = []
+		weight = []
 		for row in df.itertuples():
 			tf_dict = {}
+			weight_dict = {}
 			for token in row.Counts.keys():
-				tf_dict[token] = row.Counts[token] / row.Doc_len
+				try:
+					tf_dict[token] = row.Counts[token] / row.Doc_len
+					weight_dict[token] = tf_dict[token]*idf_dict[token]
+				except:
+					tf_dict[token] = row.Counts[token] / row.Doc_len
+					idf_dict[token] = ave_idf
+					weight_dict[token] =tf_dict[token] / ave_idf
 			tf.append(tf_dict)
+			weight.append(weight_dict)
 		df["TF"] = tf
+		df["Weight"] = weight
 		updated[cfile] = df
-	return test_data
+	return updated , idf_dict
 
 
 
 def get_freq_data( train_data:dict, counts: pd.DataFrame):
 	doc_freq = dict.fromkeys(counts["Word"] , 0)
 	for cfile in train_data:
+
 		#doc_tokens = get_document_tokens(train_data[cfile]["Reviews"])
 		df= train_data[cfile]["Reviews"]
 		for row in df.itertuples():
@@ -242,7 +269,6 @@ def plot_word_frequency(word_counts : pd.DataFrame, save = False, title = '' ):
 		plt.show()
 
 
-
 def reload_tokens(file_dict : dict):
 	uni_tokens = []
 	bi_tokens = []
@@ -264,9 +290,9 @@ def load_data():
 		if "csv" in file:
 			c_dict["Reviews"] = pd.read_csv(test_path + file,  lineterminator='\n')
 			c_dict["Reviews"].drop("Unnamed: 0" , axis = 1, inplace = True)
+			c_dict["Reviews"].dropna(inplace=True)
 			if "bigrams\r" in c_dict["Reviews"].columns:
 				c_dict["Reviews"].rename(columns={"bigrams\r": "bigrams"} , inplace=True)
-
 			with open(test_path + "Resturaunt/" + file[:-4], 'r') as fp:
 				c_dict["Resturaunt"] = json.load(fp)
 			test[file[:-4]] = deepcopy(c_dict)
@@ -282,8 +308,14 @@ def load_data():
 			train[file[:-4]] = deepcopy(c_dict)
 	return train, test
 
+def to_vector_space(df:pd.DataFrame, words:dict):
+	pass
 
-
+def get_all_data(train_dict:dict,test_dict:dict):
+	all_dict = deepcopy(train_dict)
+	for cfile in test_dict:
+		all_dict[cfile] = test_dict[cfile]
+	return train_dict
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
@@ -310,32 +342,38 @@ if __name__ == '__main__':
 	print("Finished with loading Data")
 	c_dict = prep_train_data['9IRdWhDNo2T6vyMLwrQdMw.json']
 	df = c_dict["Reviews"]
-	all_review_tokens =[]
-	all_review_tokens.extend(train_uni_tokens)
-	all_review_tokens.extend(test_uni_tokens)
-	#PARTB DELIVERABLES
-	counts = get_word_frequency(all_review_tokens) #Without bigrams
-	plot_word_frequency(counts, save = True, title= "Uni_")
-	#plot_word_frequency(counts, save = False)
-	all_review_tokens.extend(test_bi_tokens)
-	all_review_tokens.extend(train_bi_tokens)
-	counts = get_word_frequency(all_review_tokens)  # With bigrams
-	plot_word_frequency(counts , save=True, title = "All_")
+	deliver = False
+	if deliver:
+
+		all_review_tokens =[]
+		all_review_tokens.extend(train_uni_tokens)
+		all_review_tokens.extend(test_uni_tokens)
+		#PARTB DELIVERABLES
+		counts = get_word_frequency(all_review_tokens) #Without bigrams
+		plot_word_frequency(counts, save = True, title= "Uni_")
+		#plot_word_frequency(counts, save = False)
+		all_review_tokens.extend(test_bi_tokens)
+		all_review_tokens.extend(train_bi_tokens)
+		counts = get_word_frequency(all_review_tokens)  # With bigrams
+		plot_word_frequency(counts , save=True, title = "All_")
 
 
 
 	#PARTC Deliverables
 	train_counts = get_counts(prep_train_data)
 	test_counts = get_counts(prep_test_data)
+	#all_data = get_all_data(prep_train_data, prep_test_data)
+	#all_counts = get_counts(all_data)
 	# train_counts = get_word_frequency(train_tokens)
 	# doc_freqency = pd.DataFrame(get_freq_data(prep_train_data , train_counts).items() , columns=["Word" , "Doc_Freq"])
 	# counts = update_counts(train_counts, doc_freqency)
 	print("Total number of NGrams")
 	print(len(train_counts))
 	print("Top 50 NGrams")
-	print(train_counts.head(50))
+	print(train_counts[train_counts["Doc_Freq"] > 50].head(50))
 	print("Bottom 50 NGrams")
-	print(train_counts.tail(50))
-	tf = calc_tf(prep_test_data)
+	print(train_counts[train_counts["Doc_Freq"] > 50].tail(50))
+
+	tf, idf_dict = calc_tf(prep_test_data, train_counts)
 	print("Finished")
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
