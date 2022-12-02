@@ -308,8 +308,25 @@ def load_data():
 			train[file[:-4]] = deepcopy(c_dict)
 	return train, test
 
-def to_vector_space(df:pd.DataFrame, words:dict):
-	pass
+def vecotorize(tf_dict:dict, word_dict:dict ):
+	for cfile in tf_dict.keys():
+		vectors = []
+		for weight in tf[cfile]["Weight"]:
+			vec = to_vector_space(weight , word_dict)
+			vectors.append(vec)
+		tf[cfile]["Vectors"] = vectors
+		tf[cfile].to_csv("Vectors/"+cfile)
+	return tf
+
+def to_vector_space(weights, words:dict):
+	vec = np.empty(len(words))
+	w = list(words.keys())
+	for word in weights.keys():
+		try:
+			vec[w.index(word)] = weights[word]
+		except:
+			print(word)
+	return vec
 
 def get_all_data(train_dict:dict,test_dict:dict):
 	all_dict = deepcopy(train_dict)
@@ -317,12 +334,23 @@ def get_all_data(train_dict:dict,test_dict:dict):
 		all_dict[cfile] = test_dict[cfile]
 	return train_dict
 
+def load_vectors():
+	vector_path = "Vectors/"
+	tf = {}
+	for file in os.listdir(vector_path):
+		df = pd.read_csv(vector_path + file,  lineterminator='\n')
+		df.drop("Unnamed: 0" , axis = 1, inplace = True)
+		df.dropna(inplace=True)
+		tf[file[:-4]] = df
+	return tf
+
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
 	#nltk.download('punkt') #FIXME This must be donwloaded for everything to work properly
 	#nltk.download('stopwords')
 	load = True
-
+	reload_vectors = True
+	recalculate_zipf = False
 	if not load:
 		all_files, train, test ,reviews = read_data()
 		#PARTA DEVLIVERABLES
@@ -342,9 +370,8 @@ if __name__ == '__main__':
 	print("Finished with loading Data")
 	c_dict = prep_train_data['9IRdWhDNo2T6vyMLwrQdMw.json']
 	df = c_dict["Reviews"]
-	deliver = False
-	if deliver:
 
+	if recalculate_zipf:
 		all_review_tokens =[]
 		all_review_tokens.extend(train_uni_tokens)
 		all_review_tokens.extend(test_uni_tokens)
@@ -374,6 +401,12 @@ if __name__ == '__main__':
 	print("Bottom 50 NGrams")
 	print(train_counts[train_counts["Doc_Freq"] > 50].tail(50))
 
-	tf, idf_dict = calc_tf(prep_test_data, train_counts)
+	tf, idf_dict = calc_tf(prep_test_data, test_counts)
+	Q = load_Query()
+
+	if reload_vectors:
+		tf = load_vectors()
+	else:
+		tf = vecotorize(tf, idf_dict)
 	print("Finished")
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
