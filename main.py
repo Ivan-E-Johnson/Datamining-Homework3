@@ -314,13 +314,15 @@ def vectorize_prep(df: pd.DataFrame):
 
 
 def vecotorize(tf_dict:dict, word_dict:dict ):
+	print("Starting Vectorizing Proccess")
 	for cfile in tf_dict.keys():
 		vectors = []
 		for weight in tf[cfile]["Weight"]:
 			vec = to_vector_space(weight , word_dict)
 			vectors.append(vec)
 		tf[cfile]["Vectors"] = vectors
-		tf[cfile].to_csv("Vectors/"+cfile)
+		tf[cfile].to_csv("Vectors/"+cfile+".csv")
+		print("Done With " + cfile)
 	return tf
 
 def to_vector_space(weights, words:dict):
@@ -383,12 +385,12 @@ def Unigram_model_to_dict(unigram_model):
 if __name__ == '__main__':
 	#nltk.download('punkt') #FIXME This must be donwloaded for everything to work properly
 	#nltk.download('stopwords')
-	reload_vectors = True 		#CAN SET TO TRUE IF YOU WANT TO SPEED UP THE PROCESS
+	reload_vectors = False 		#CAN SET TO TRUE IF YOU WANT TO SPEED UP THE PROCESS
 	partA_deliverables = False  #CAN SET TO FALSE IF YOU WANT TO SPEED UP THE PROCESS
 	partB_deliverables = False
 	partC_deliverables = False
-	partD_deliverables = False
-	partE_deliverables = True
+	partD_deliverables = True
+	partE_deliverables = False
 	partF_deliverables = False
 	if partA_deliverables:
 		all_files, train, test ,reviews = read_data()
@@ -447,7 +449,6 @@ if __name__ == '__main__':
 		Q = load_Query()
 		if reload_vectors:
 			full_vectors = load_vectors()
-
 		else:
 			full_vectors = vecotorize(tf, idf_dict)
 
